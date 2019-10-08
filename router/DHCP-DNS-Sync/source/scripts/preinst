@@ -1,0 +1,17 @@
+#!/bin/sh
+ZoneRootDir=/var/packages/DNSServer/target
+ZonePath=$ZoneRootDir/named/etc/zone/master
+ZoneLoadConfFile=zone.load.conf
+ZoneLoadConfPath=$ZoneRootDir/named/etc/zone/$ZoneLoadConfFile
+
+if [ ! -r $ZoneLoadConfPath ]; then
+    echo "Unable to read $ZoneLoadConfPath. Is DNSServer installed?" 
+    exit 3
+fi
+
+if [ ! -d $ZonePath ]; then
+    echo "Unable to find $ZonePath. Is DNSServer installed?" 
+    exit 3
+fi
+
+exit 0

@@ -1,0 +1,57 @@
+#!/bin/ash
+
+LOGFILE=$SYNOPKG_PKGDEST/var/log/dhcp-dns.log
+touch $LOGFILE
+
+if $(ps x > /dev/null 2>&1 ); then
+  #apparently DSM 6.0 needs the x option for ps.  DSM 5.x does not have this option, but the default ps is good enough without options.
+  PS="ps x"
+else
+  PS="ps"
+fi
+
+POLL_RUNNING=0
+MYPID=0
+if [ -f $SYNOPKG_PKGDEST/var/poll-dhcp-changes.pid ]; then
+    MYPID=`cat $SYNOPKG_PKGDEST/var/poll-dhcp-changes.pid`
+    if [ -f /proc/$MYPID]; then
+        POLL_RUNNING=1
+    fi
+fi
+
+case $1 in
+    start)
+        if [ $POLL_RUNNING -gt 0 ]; then
+            echo "Already polling for DHCP changes (PID: $MYPID)." >> $SYNOPKG_TEMP_LOGFILE
+        else
+            $SYNOPKG_PKGDEST/bin/poll-dhcp-changes.sh 2>&1 &
+            MYPID=$!
+            echo "Started polling for DHCP changes." >> $SYNOPKG_TEMP_LOGFILE
+            echo $MYPID > $SYNOPKG_PKGDEST/var/poll-dhcp-changes.pid
+        fi
+        exit 0
+    ;;
+    log)
+        echo $LOGFILE
+        exit 0
+    ;;
+    status)        
+        if [ $POLL_RUNNING -gt 0 ]; then
+            exit 0
+        else
+            exit 3
+        fi
+    ;;
+    stop)
+        if [ $POLL_RUNNING -gt 0 ]; then
+            kill $MYPID
+            echo "Stopped polling for DHCP changes (PID: $MYPID)." >> $SYNOPKG_TEMP_LOGFILE 
+        fi
+        exit 0
+    ;;
+    *)
+        exit 0
+    ;;
+esac
+
+exit 0

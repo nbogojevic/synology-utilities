@@ -1,0 +1,28 @@
+#!/bin/sh
+
+SettingsFile=$SYNOPKG_PKGDEST/etc/dhcp-dns-sync.conf
+
+DNSServerRootDir=/var/packages/DNSServer/target
+MasterFilePath=$DNSServerRootDir/named/etc/zone/master
+DataFilePath=$DNSServerRootDir/named/etc/zone/data
+ZoneLoadConfFile=zone.load.conf
+ZoneLoadConfPath=$DNSServerRootDir/named/etc/zone/$ZoneLoadConfFile
+ZoneUIConfFile=zone.conf
+ZoneUIConfPath=$DNSServerRootDir/etc/zone.conf
+
+. $SettingsFile
+
+if [ $GeneratedForwardZone == "yes" ]; then
+    rm -f $DataFilePath/$ForwardMasterFile
+    rm -f $MasterFilePath/$ForwardMasterFile
+    awk -v RemovePath "..etc.zone.data.$ForwardMasterFile" '$2 !~ RemovePath { print $0 }' $ZoneLoadConfPath > $ZoneLoadConfPath
+fi
+
+if [ $GeneratedReverseZone == "yes" ]; then
+    rm -f $DataFilePath/$ReverseMasterFile
+    rm -f $MasterFilePath/$ReverseMasterFile
+    awk -v RemovePath "..etc.zone.data.$ReverseMasterFile" '$2 !~ RemovePath { print $0 }' $ZoneLoadConfPath > $ZoneLoadConfPath
+fi
+
+# TODO remove sections from UI conf /etc/zone.conf
+exit 0

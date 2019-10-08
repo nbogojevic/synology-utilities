@@ -1,0 +1,203 @@
+#!/bin/ash
+
+BackupPath=$SYNOPKG_PKGDEST/var/backups
+SettingsFile=$SYNOPKG_PKGDEST/etc/dhcp-dns-sync.conf
+
+DNSServerRootDir=/var/packages/DNSServer/target
+MasterFilePath=$DNSServerRootDir/named/etc/zone/master
+DataFilePath=$DNSServerRootDir/named/etc/zone/data
+ZoneLoadConfFile=zone.load.conf
+ZoneLoadConfPath=$DNSServerRootDir/named/etc/zone/$ZoneLoadConfFile
+ZoneUIConfFile=zone.conf
+ZoneUIConfPath=$DNSServerRootDir/
+DhcpConf=/etc/dhcpd/dhcpd.conf
+
+if ! mkdir -p ${BackupPath}; then
+    echo "Error: cannot create backup directory" > $SYNOPKG_TEMP_LOGFILE 
+    exit 3
+fi
+
+if ! mkdir -p ${SYNOPKG_PKGDEST}/var/log; then
+    echo "Error: cannot create /var/log directory" > $SYNOPKG_TEMP_LOGFILE 
+    exit 3
+fi
+
+if ! mkdir -p ${SYNOPKG_PKGDEST}/etc; then
+    echo "Error: cannot create /etc directory" > $SYNOPKG_TEMP_LOGFILE 
+    exit 3
+fi
+
+if [ -f $SettingsFile ]; then
+    rm -f $SettingsFile
+fi
+
+echo "PollInterval=${WZ_POLL_INTERVAL}" >> $SettingsFile
+echo "NetworkDomain=${WZ_DOMAIN}" >> $SettingsFile
+echo "ForwardMasterFile=${WZ_DOMAIN}" >> $SettingsFile
+echo "ReverseMasterFile=${WZ_REVERSE}" >> $SettingsFile
+
+echo "LogFileName=dhcp-dns.log" >> $SettingsFile
+echo "LogPath=$SYNOPKG_PKGDEST/var/log" >> $SettingsFile
+echo "LogFile=$SYNOPKG_PKGDEST/var/log/dhcp-dns.log" >> $SettingsFile
+echo "SetupLogFile=$SYNOPKG_PKGDEST/var/log/dhcp-dns-setup.log" >> $SettingsFile
+echo "BinPath=$SYNOPKG_PKGDEST/bin" >> $SettingsFile
+echo "BackupPath=$BackupPath" >> $SettingsFile
+
+. $SettingsFile
+echo "<h1>DNS configuration</h1><br>Domain/forward zone: <b>$ForwardMasterFile</b><br>Reverse zone: <b>$ReverseMasterFile</b>" >> $SYNOPKG_TEMP_LOGFILE 
+
+# Make copy of zone load configuration file
+tmpPrefix="$BackupPath/Original_"
+cp -a $ZoneLoadConfPath $tmpPrefix.$ZoneLoadConfFile
+cp -a $ZoneUIConfPath $tmpPrefix.$ZoneUIConfFile
+
+echo "Old $ZoneLoadConfPath file:" >> $SetupLogFile
+cat $ZoneLoadConfPath >> $SetupLogFile 
+
+# Find router ip and hostname
+NetworkInterface="lbr0"
+RouterIP="`ip addr show $NetworkInterface | awk '$1 == "inet" {split($2, arr, "/"); print arr[1];}'`"
+RouterReverseIP="`ip addr show $NetworkInterface | awk '$1 == "inet" {split($2, arr, "/"); split(arr[1], rev, "."); print rev[4] "." rev[3] "." rev[2] "." rev[1];}'`"
+RouterHost="`cat /etc/hostname`"
+
+if [ ! grep "include \"/etc/zone/data/$ForwardMasterFile" $ZoneLoadConfPath ]; then
+	echo "GeneratedForwardZone=yes" >> $SettingsFile
+# Reference file in load configuration file
+	echo "	include \"/etc/zone/data/$ForwardMasterFile\"" >> $ZoneLoadConfFile
+
+# Create zone data file
+	cat > $DataFilePath/$ForwardMasterFile <<EOF
+zone "$ForwardMasterFile" {
+        type master;
+        file "/etc/zone/master/$ForwardMasterFile";
+        allow-transfer {none;};
+        allow-update {none;};
+};
+EOF
+
+# Create reverse master file
+    cat > $MasterFilePath/$ForwardMasterFile <<EOF
+\$ORIGIN $ForwardMasterFile.
+\$TTL 86400
+$ForwardMasterFile. IN SOA ns.$ForwardMasterFile. mail.$ForwardMasterFile. (
+	1 ;
+	43200
+	180
+	1209600
+	10800
+)
+$YourNetworkName.	NS	ns.$YourNetworkName.
+ns.$YourNetworkName.	A	$RouterIP
+$RouterHost.$YourNetworkName.	86400	A	$RouterIP
+EOF
+
+# add data to /var/packages/DNSServer/target/etc/zone.conf
+	cat >> $ZoneUIConfPath <<EOF
+[$ForwardMasterFile]
+        host_name="ns.$YourNetworkName."
+        allow-update-key=""
+        type="master"
+        allow-transfer=""
+        allow-query=""
+        allow-query-subnet=""
+        allow-query-ip=""
+        domain_type="forward"
+        limit_update="yes"
+        forward=""
+        zonename="$ForwardMasterFile"
+        slavekey=""
+        allow-transfer-ip=""
+        allow-update=""
+        enable_tsig="no"
+        allow-transfer-subnet=""
+        forwarders=""
+        allow-update-subnet=""
+        allow-transfer-key=""
+        allow-update-ip=""
+        zone_enable="yes"
+        domain="$YourNetworkName"
+        serial_format="integer"
+        org_mail="mail@$YourNetworkName."
+        masters=""
+        host_mail="mail.$YourNetworkName."
+        limit_transfer="yes"
+        limit_query="yes"
+EOF
+
+    echo "Generated zone files for <b>$ForwardMasterFile</b><br>" >> $SYNOPKG_TEMP_LOGFILE
+    echo "Generated zone files for <b>$ForwardMasterFile</b><br>" >> $SetupLogFile 
+fi
+
+if [ ! grep "include \"/etc/zone/data/$ReverseMasterFile" $ZoneLoadConfPath ]; then
+	echo "GeneratedReverseZone=yes" >> $SettingsFile
+# Reference file in load configuration file
+	echo "	include \"/etc/zone/data/$ReverseMasterFile\"" >> $ZoneLoadConfFile
+
+# Create zone data file
+	cat > $DataFilePath/$ForwardMasterFile <<EOF
+zone "$ReverseMasterFile" {
+        type master;
+        file "/etc/zone/master/$ReverseMasterFile";
+        allow-transfer {none;};
+        allow-update {none;};
+};
+EOF
+
+# Create reverse master file
+    cat > $MasterFilePath/$ReverseMasterFile <<EOF
+\$ORIGIN $ReverseMasterFile.
+\$TTL 86400
+$ReverseMasterFile. IN SOA ns.$ReverseMasterFile. mail.$ReverseMasterFile. (
+	1 ;
+	43200
+	180
+	1209600
+	10800
+)
+$ReverseMasterFile.	86400	NS	ns.$YourNetworkName.
+$RouterReverseIP.in-addr.arpa.	86400	PTR	$RouterHost.$YourNetworkName.
+EOF
+
+# add data to /var/packages/DNSServer/target/etc/zone.conf
+	cat >> $ZoneUIConfPath <<EOF
+[$ReverseMasterFile]
+        host_name="ns.$ReverseMasterFile."
+        allow-update-key=""
+        type="master"
+        allow-transfer=""
+        allow-query=""
+        allow-query-subnet=""
+        allow-query-ip=""
+        domain_type="reverse"
+        limit_update="yes"
+        forward=""
+        zonename="$ReverseMasterFile"
+        slavekey=""
+        allow-transfer-ip=""
+        allow-update=""
+        enable_tsig="no"
+        allow-transfer-subnet=""
+        forwarders=""
+        allow-update-subnet=""
+        allow-transfer-key=""
+        allow-update-ip=""
+        zone_enable="yes"
+        domain="$ReverseMasterFile"
+        serial_format="integer"
+        org_mail="mail@$ReverseMasterFile."
+        masters=""
+        host_mail="mail.$ReverseMasterFile."
+        limit_transfer="yes"
+        limit_query="yes"EOF
+EOF
+
+    echo "Generated zone files for <b>$ReverseMasterFile</b><br>" >> $SYNOPKG_TEMP_LOGFILE 
+    echo "Generated zone files for <b>$ReverseMasterFile</b><br>" >> $SetupLogFile 
+fi
+
+echo "New $ZoneLoadConfPath file:" >> $SetupLogFile
+cat $ZoneLoadConfPath >> $SetupLogFile 
+echo "Settings:" >> $SetupLogFile
+cat $SettingsFile >> $SetupLogFile 
+
+$DNSServerRootDir/script/reload.sh
