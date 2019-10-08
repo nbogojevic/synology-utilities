@@ -1,17 +1,18 @@
 #! /bin/sh
 
 # Load configuration
-if [ -f "$HOME/update-docker-images-containers.conf" ]; then
-	source "$HOME/update-docker-images-containers.conf"
+if [ -f "$HOME/update-docker-images.conf" ]; then
+	source "$HOME/update-docker-images.conf"
 fi
-if [ -f "./update-docker-images-containers.conf" ]; then
-	source "./update-docker-images-containers.conf"
+if [ -f "./update-docker-images.conf" ]; then
+	source "./update-docker-images.conf"
 fi
 
 # Set default values
 SYNOLOGY_HOST=${SYNOLOGY_HOST:-http://localhost:5000}
 SYNOLOGY_USER=${SYNOLOGY_USER:-admin}
 SYNOLOGY_PASSWORD=${SYNOLOGY_PASSWORD:-password}
+DOCKER_PRUNE=${DOCKER_PRUNE:-no}
 
 # Get session from Synology DSM
 echo "Logging in to $SYNOLOGY_HOST as user $SYNOLOGY_USER"
@@ -28,7 +29,7 @@ UPDATED_IMAGES=""
 for IMAGE in $IMAGES_TO_PULL
 do
 	# Pull each image
-	echo "Pulling image $IMAGE"
+	echo "Pulling $IMAGE"
 	# If new image has been downloaded add it to list of images to update
 	docker pull $IMAGE | tee /dev/tty | grep "Status: Downloaded" > /dev/null && UPDATED_IMAGES="$UPDATED_IMAGES$IMAGE\n"
 done
@@ -47,15 +48,15 @@ EVERYTHING_OK="yes"
 for IMAGE in $UPDATED_IMAGES
 do
 	CONTAINER_NAME=`echo "$CONTAINERS" | jq --raw-output --arg IMAGE "$IMAGE" '.data.result[0].data.containers[] | select(.["image"] | contains($IMAGE)) | .name'`
-	echo "Stopping container $CONTAINER_NAME"
+	echo "Stopping $CONTAINER_NAME"
 	OPERATION_FAILED="no"
 	# Stop container
 	if curl --silent $SYNOLOGY_HOST/webapi/entry.cgi -b "id=$SESSION_ID" -d "name=%22$CONTAINER_NAME%22&api=SYNO.Docker.Container&method=stop&version=1" | jq '.success == true' > /dev/null; then
-		echo "Cleaning container $CONTAINER_NAME"	
+		echo "Cleaning $CONTAINER_NAME"	
 		# Clean container contents
 		curl --silent $SYNOLOGY_HOST/webapi/entry.cgi -b "id=$SESSION_ID" -d "name=%22$CONTAINER_NAME%22&force=false&preserve_profile=true&api=SYNO.Docker.Container&method=delete&version=1" | jq '.success == true' > /dev/null || (echo "Unable to clean container $CONTAINER_NAME" >&2 && OPERATION_FAILED="yes")
 		# Restart new container with old configuration
-		echo "Restarting container $CONTAINER_NAME"	
+		echo "Restarting $CONTAINER_NAME"	
 		curl --silent $SYNOLOGY_HOST/webapi/entry.cgi -b "id=$SESSION_ID" -d "name=%22$CONTAINER_NAME%22&api=SYNO.Docker.Container&method=start&version=1" | jq '.success == true' > /dev/null || (echo "Unable to restart $CONTAINER_NAME" >&2 && OPERATION_FAILED="yes")
 	else
 		OPERATION_FAILED="yes"
@@ -64,7 +65,7 @@ do
 	fi
 
 	if [ "$OPERATION_FAILED" == "yes" ]; then
-		echo "Error while upgrading container $CONTAINER_NAME with new $IMAGE" >&2
+		echo "Error while to upgrade $CONTAINER_NAME with new $IMAGE" >&2
 	else
 		# If a container has been successfuly recycled, add prune
 		echo "Finished upgrading $CONTAINER_NAME with new $IMAGE"
@@ -73,13 +74,13 @@ done
 
 if [ "$EVERYTHING_OK" == "yes" ]; then
 	# Prune docker unused images
-	if [ "$DOCKER_CLEANUP" == "yes" ]; then
-		echo "Cleaning unused images"
+	if [ "$DOCKER_PRUNE" == "yes" ]; then
+		echo "Cleaning unused images."
 		docker image prune --force
 	fi
 	echo "Finished." >&2
 	exit 0
 else
-	echo "There were errors, please see log." >&2
+	echo "There were errors." >&2
 	exit 1
 fi
