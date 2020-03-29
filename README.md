@@ -9,6 +9,14 @@ Various utilities to manage Synology NAS and routers
 
 `switch-fan-to-high-speed.sh` activates high speed for Synology NAS fan. Can be used with scheduled tasks to activate cooling mode when needed.
 
+`synology-freenom.sh` can be used as DDNS module for Synology DSM. To use it, append following at the end of the file 
+`/etc.defaults/ddns_provider.conf`
+
+```ini
+[Freenom]
+        modulepath=/path-to-your-git-repository/synology-freenom.sh
+        queryurl=https://my.freenom.com/
+```
 
 # Router/SRM
 
