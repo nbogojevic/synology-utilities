@@ -18,6 +18,8 @@ Various utilities to manage Synology NAS and routers
         queryurl=https://my.freenom.com/
 ```
 
+You can add it to the DDNS configuration in Control Panel > External Access. Enter Freenom credentials. In the host field, either enter `all` to update all your domains, or enter specific domain you want to update.
+
 # Router/SRM
 
 DHCP-DNS-Sync allows synchronizing DNS Server with DHCP leases given out by Router.
