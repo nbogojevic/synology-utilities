@@ -31,7 +31,7 @@ do
 	# Pull each image
 	echo "Pulling $IMAGE"
 	# If new image has been downloaded add it to list of images to update
-	docker pull $IMAGE | tee /dev/tty | grep "Status: Downloaded" > /dev/null && UPDATED_IMAGES="$UPDATED_IMAGES$IMAGE\n"
+	docker pull $IMAGE | grep "Status: Downloaded" > /dev/null && UPDATED_IMAGES="$UPDATED_IMAGES$IMAGE\n"
 done
 
 UPDATED_IMAGES=`echo -e "$UPDATED_IMAGES"`
