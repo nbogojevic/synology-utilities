@@ -18,8 +18,8 @@ DOCKER_PRUNE=${DOCKER_PRUNE:-no}
 echo "Logging in to $SYNOLOGY_HOST as user $SYNOLOGY_USER"
 SESSION_ID=`curl --silent "$SYNOLOGY_HOST/webapi/auth.cgi?api=SYNO.API.Auth&version=2&method=login&account=$SYNOLOGY_USER&passwd=$SYNOLOGY_PASSWORD&format=cookie&session=Docker" | jq --raw-output .data.sid`
 
-
-if [ IMAGES_TO_PULL == "" ]; then
+# If not images have been provided in environment
+if [ IMAGES_TO_PULL != "" ]; then
 	# Get running containers
 	echo "Retreiving running containers"
 	CONTAINERS=`curl --silent $SYNOLOGY_HOST/webapi/entry.cgi -b id=$SESSION_ID -d "stop_when_error=true&mode=%22sequential%22&compound=%5B%7B%22api%22%3A%22SYNO.Docker.Container%22%2C%22method%22%3A%22list%22%2C%22version%22%3A1%2C%22limit%22%3A-1%2C%22offset%22%3A0%7D%2C%7B%22api%22%3A%22SYNO.Docker.Container.Resource%22%2C%22method%22%3A%22get%22%2C%22version%22%3A1%7D%5D&api=SYNO.Entry.Request&method=request&version=1"`
@@ -30,7 +30,6 @@ else
 fi
 echo "$IMAGES_TO_PULL"
 
-if [ "$"]
 IFS=$'\n'
 UPDATED_IMAGES=""
 for IMAGE in $IMAGES_TO_PULL
