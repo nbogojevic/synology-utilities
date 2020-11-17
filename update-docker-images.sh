@@ -9,10 +9,16 @@ if [ -f "./update-docker-images.conf" ]; then
 fi
 
 # Set default values
+# Name of the host to administer (should be local machine)
 SYNOLOGY_HOST=${SYNOLOGY_HOST:-http://localhost:5000}
+# The admin username
 SYNOLOGY_USER=${SYNOLOGY_USER:-admin}
+# The admin password
 SYNOLOGY_PASSWORD=${SYNOLOGY_PASSWORD:-password}
+# Should old docker images be deleted (yes or no)
 DOCKER_PRUNE=${DOCKER_PRUNE:-no}
+# Images to check/update, separated by new lines
+IMAGES_TO_PULL=${IMAGES_TO_PULL:-}
 
 # Get session from Synology DSM
 echo "Logging in to $SYNOLOGY_HOST as user $SYNOLOGY_USER"
